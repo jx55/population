@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<head>
+	<title>全国省会城市人口数据可视图</title>
+	<link href="../css/webwidget_menu_glide.css" rel="stylesheet" type="text/css"></link>
+	<script type="text/javascript" src="../js/jquery-1.3.2.min.js"></script>
+	<script type="text/javascript" src="../js/webwidget_menu_glide.js"></script>
+	<link href="./css/index.css" rel="stylesheet" type="text/css"></link>
+</head>
+<body>
+	<h2 style="text-align: center">全国人口地区以及年龄结构分布图</h2>
+	<svg width="1400" height="500" id="statesvg" transform="translate(250 100) scale(1.3)"></svg>
+	<div id="tooltip"></div>
+	<script src="china-zh2.js"></script>
+	<script type="text/javascript" src="area.js"></script>
+	<script type="text/javascript" src="chinese.js"></script>
+	<script src="d3.js"></script>
+	<span style="color: #0EB8F1"></span>
+	<span style="color: #ff0000"></span>
+	<span style="color: #0000ff"></span>
+	<span style="color: #00d9ff"></span>
+	<span style="color: #ff3c00"></span>
+	<script>
+		//中国地图
+		function tooltipHtml(n, m, d) {
+			//console.log(d);
+			return "<h2>" + n + "</h2><table>" +
+				"<tr><td>当年常住人口</td><td>" + (d.people) + "万人</td></tr>" +
+				"</table>";
+		}
+		var year = 2009;
+		var sampleData = {};
+		function changemap(yr) {
+			var curdata = areadata.filter(function (d) { return d.year == yr });
+			//console.log(curdata);
+
+			//['JXI', 'LIA', 'TIB', 'NMG', 'SHH', 'CHQ', 'XIN', 'SHD', 'HEN', 'GUD', 'GUI', 'BEJ', 'MAC', 'TAJ', 'HLJ', 'HEB', 'ZHJ', 'ANH', 'GXI', 'HAI', 'JIL', 'SHX', 'HUN', 'YUN', 'FUJ', 'HUB', 'SHA', 'HKG', 'QIH', 'GAN', 'JSU', 'SCH', 'NXA', 'TAI']
+			curdata.forEach(function (d) {
+				//console.log(ac++);
+				sampleData[d.area] = {
+					people: d.people,
+					color: d3.interpolate("#00d9ff", "#ff3c00")(d.people / 12500)
+				};
+			});
+			/* draw states on id #statesvg */
+			//console.log(sampleData);	
+			uStates.draw("#statesvg", sampleData, tooltipHtml);
+		}
+		changemap(year);
+		//changemap(2019);
+
+		//人口年龄分布图
+		document.onkeydown = function (event) {
+			var y = year;
+			switch (event.keyCode) {
+				case 37: // left arrow
+					y = Math.max(2009, year - 1);
+					if (y == 2010) y -= 1;
+					break;
+				case 39: // right arrow
+					y = Math.min(2019, year + 1);
+					if (y == 2010) y += 1;
+					break;
+				case 32: // space bar
+					toggle();
+					return;
+			}
+			if (y != year) goto(y);
+		};
+
+		function isYear(d) { return d.year == year; }
+		function linkClass(y) { return "y" + y.toFixed(0) + (y == year ? " active" : ""); }
+		function tooltipText(d) {
+			return (d.year) + "年" + (d.age == 95 ? "95+" : d.age + "-" + (d.age + 4)) + "岁年龄段的" + (d.sex == 1 ? "男性" : "女性") + "人口数为" + (d.people / 10000) + "万人"
+		}
+		function barWidth(d) { return x1(d.people); }
+
+		function goto(yr, dur) {
+			dur = dur || 300;
+			var old = year;
+			year = yr;
+
+			changemap(yr);
+
+			label.text(year);
+
+			div.selectAll("span.link a")
+				.attr("class", linkClass);
+
+			var fb = vis.selectAll("rect.female")
+				.data(fdat.filter(isYear))
+
+			fb.transition()
+				.duration(dur)
+				.attr("transform", lTransform)
+				.attr("y", 0)
+				.attr("width", function (d) { return x1(d.people); })
+				.attr("opacity", 1);
+			fb.selectAll("title").text(tooltipText);
+
+
+			var mb = vis.selectAll("rect.male").data(mdat.filter(isYear))
+
+			mb.transition()
+				.duration(dur)
+				.attr("transform", rTransform)
+				.attr("y", 0)
+				.attr("width", function (d) { return x1(d.people); })
+				.attr("opacity", 1);
+			mb.select("title").text(tooltipText);
+		}
+
+		var timer = undefined;
+		function stop() {
+			clearInterval(timer);
+			timer = undefined;
+			ctrls.select("a.toggle").text("play");
+		}
+		function toggle() {
+			if (!timer) {
+				play();
+			} else {
+				stop();
+			}
+		}
+		function play(rev) {
+			rev = rev || false;
+			if (timer) { stop(); }
+			ctrls.select("a.toggle").text("stop");
+			var advance = function () {
+				var y = year + (rev ? -1 : 1);
+				if (y == 2010) {
+					y = y + (rev ? -1 : 1);
+				}
+				if (y < 2009 || y > 2019) {
+					stop();
+					return;
+				} else {
+					goto(y, 800);
+				}
+			};
+			advance();
+			timer = setInterval(advance, 850);
+		}
+
+		var data = census,
+			maxp = data.reduce(function (a, b) { return Math.max(a, b.people); }, 0),
+			mdat = data.filter(function (d) { return d.sex == 1; })
+				.sort(function (a, b) { return b.age - a.age; }),
+			fdat = data.filter(function (d) { return d.sex == 2; })
+				.sort(function (a, b) { return b.age - a.age; });
+		//onsole.log(fdat);
+		var w = 250,
+			h = 19 * 20,
+			bins = d3.range(20),
+			y = d3.scaleBand().domain(bins).range([0, h], 0.25),
+			x1 = d3.scaleLinear().domain([0, maxp]).range([0, w]),
+			x2 = d3.scaleLinear().domain([0, maxp]).range([w, 0]),
+			height = y.step() / 1.3,
+			rf = "javascript:return false;";
+
+		var label = d3.select("body")
+			.append("div")
+			.attr("class", "label")
+			.text(year.toFixed(0));
+
+		var vis = d3.select("#statesvg")
+			//.attr("width", 2 * w + 40)
+			//.attr("height", h + 40)
+			.append("g")
+			.attr("transform", "translate(800,15)");
+
+		// pyramid bar chart
+
+		vis.append("g")
+			.selectAll("text.ages")
+			.data(bins)
+			.enter()
+			.append("text")
+			.filter(function (d) { return d % 2 == 0; })
+			.attr("class", "ages")
+			.attr("x", w + 15)
+			.attr("y", function (d) { return y(d) + y.step() + 7; })
+			.attr("fill", "#888")
+			.attr("text-anchor", "middle")
+			.attr("font-size", "12px")
+			.text(function (d) { return (90 - d * 5).toFixed(0); });
+
+		var rTransform = function (d, i) {
+			return "translate(" + (w + 30) + "," + y(i).toFixed(2) + ")";
+		}
+		var lTransform = function (d, i) {
+			return "translate(" + x2(d.people).toFixed(2) + "," + y(i).toFixed(2) + ")";
+		}
+		var lEnter = function (d, i) {
+			return "translate(" + w + "," + y(i).toFixed(2) + ")";
+		}
+
+		var mbars = vis.selectAll("rect.male")
+			.data(mdat.filter(isYear))
+			.enter()
+			.append("rect")
+			.attr("id", function (d) { return "m" + (d.year - d.age); })
+			.attr("class", "male")
+			.attr("fill", "steelblue")
+			.attr("transform", rTransform)
+			.attr("width", barWidth)
+			.attr("height", height)
+			.attr("y", 0)
+			.attr("opacity", 1);
+
+		mbars.append("svg:title").text(tooltipText);
+
+		var fbars = vis.selectAll("rect.female")
+			.data(fdat.filter(isYear))
+			.enter()
+			.append("rect")
+			.attr("id", function (d) { return "f" + (d.year - d.age); })
+			.attr("class", "female")
+			.attr("fill", "pink")
+			.attr("opacity", 1)
+			.attr("transform", lTransform)
+			.attr("width", barWidth)
+			.attr("height", height)
+			.attr("y", 0)
+			.attr("opacity", 1);
+
+		fbars.append("svg:title").text(tooltipText);
+
+		// animated intro for bars
+
+		mbars.attr("width", 0)
+			.transition()
+			.duration(500)
+			.delay(function (d, i) { return 30 * i; })
+			.attr("width", barWidth);
+
+		fbars.attr("width", 0)
+			.attr("transform", lEnter)
+			.transition()
+			.duration(500)
+			.delay(function (d, i) { return 30 * i; })
+			.attr("width", barWidth)
+			.attr("transform", lTransform);
+
+		// age label
+
+		vis.append("svg:text")
+			.attr("x", w + 15)
+			.attr("y", h + 8)
+			.attr("dy", ".71em")
+			.attr("fill", "#888")
+			.attr("text-anchor", "middle")
+			.attr("font-size", "13px")
+			.attr("font-variant", "small-caps")
+			.attr("letter-spacing", 1)
+			.text("age");
+
+		// gridlines and labels for right pyramid
+
+		var rules1 = vis.selectAll("g.rule1")
+			.data(x1.ticks(5))
+			.enter()
+			.append("g")
+			.filter(function (d) { return d > 0; })
+			.attr("class", "rule1")
+			.attr("transform", function (d) { return "translate(" + (w + 30 + x1(d)) + ",0)"; });
+
+		rules1.append("svg:line")
+			.attr("y1", h - 2)
+			.attr("y2", h + 4)
+			.attr("stroke", "#bbb");
+
+		rules1.append("svg:line")
+			.attr("y1", 0)
+			.attr("y2", h)
+			.attr("stroke", "white")
+			.attr("stroke-opacity", .3);
+
+		rules1.append("svg:text")
+			.attr("y", h + 9)
+			.attr("dy", ".71em")
+			.attr("text-anchor", "middle")
+			.attr("font-size", "12px")
+			.attr("fill", "#bbb")
+			.text(function (d) { return (d / 1000000).toFixed(0) + "M"; });
+
+		// gridlines and labels for left pyramid
+
+		var rules2 = vis.selectAll("g.rule2")
+			.data(x2.ticks(5))
+			.enter()
+			.append("g")
+			.filter(function (d) { return d > 0; })
+			.attr("class", "rule2")
+			.attr("transform", function (d) { return "translate(" + (x2(d)) + ",0)"; });
+
+		rules2.append("svg:line")
+			.attr("y1", h - 2)
+			.attr("y2", h + 4)
+			.attr("stroke", "#bbb");
+
+		rules2.append("svg:line")
+			.attr("y1", 0)
+			.attr("y2", h)
+			.attr("stroke", "white")
+			.attr("stroke-opacity", .3);
+
+		rules2.append("svg:text")
+			.attr("y", h + 9)
+			.attr("dy", ".71em")
+			.attr("text-anchor", "middle")
+			.attr("font-size", "12px")
+			.attr("fill", "#bbb")
+			.text(function (d) { return (d / 1000000).toFixed(0) + (d == 0 ? "" : "M"); });
+
+		var ctrlAll = d3.select("body")
+			.append("div")
+			.attr("class", "ctrlAll")
+
+		ctrlAll.append("div")
+			.attr("class", "break");
+
+
+		var div = ctrlAll.append("div")
+			.attr("class", "years");
+
+		div.append("span")
+			.attr("class", "title")
+			.text("year");
+
+		var ctrls = ctrlAll.append("div")
+			.attr("class", "controls");
+		ctrls.append("span").append("a")
+			.attr("class", "control back")
+			.attr("href", "javascript:play(true);")
+			.text("<< ");
+		ctrls.append("span").append("a")
+			.attr("class", "control toggle")
+			.attr("href", "javascript:toggle();")
+			.text("play");
+		ctrls.append("span").append("a")
+			.attr("class", "control forward")
+			.attr("href", "javascript:play();")
+			.text(" >>");
+
+		div.selectAll("span.link")
+			.data(d3.range(2009, 2020))
+			.enter()
+			.append("span")
+			.attr("class", "link")
+			.append("a")
+			.attr("class", linkClass)
+			.attr("href", function (d) { return d == 2010 ? null : "javascript:goto(" + d + ");"; })
+			.text(function (d) { return d.toFixed(0); });
+
+
+
+	</script>
+</body>

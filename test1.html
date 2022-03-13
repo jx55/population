@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Document</title>
+	<script>
+		var province = ""
+		var thisURL = decodeURI(document.URL);	
+    	var getVal = thisURL.split('?')[1].split("=")[1];
+		province = getVal
+		
+		// console.log(province)
+	</script>
+	<link href="./css/population.css" rel="stylesheet" type="text/css"></link>
+</head>
+<body style="font-family:微软雅黑"">
+<!-- 标题 -->
+	<div class="bar">
+		<font id="part" class="part">浙江省</font>
+		<font>人口数据分析</font>
+	</div>
+<!-- 主体 -->
+	<div class="_body">
+	<!-- 信息栏 -->
+		<div class="bar_1">
+			<div class="bar_1_1">
+				<div id="num" class="bar_data_1">6468,0000,0000</div>
+				<div class="bar_text_1">总人口</div>
+			</div>
+			<div class="bar_1_2">
+				<div id="birth_rate" class="bar_data_2">10.51%</div>
+				<div class="bar_text_2">出生率</div>
+			</div>
+			<div class="bar_1_3">
+				<div id="death_rate" class="bar_data_3">5.52%</div>
+				<div class="bar_text_3">死亡率</div>
+			</div>
+			<div class="bar_1_4">
+				<div id="growth_rate" class="bar_data_4">4.99%</div>
+				<div class="bar_text_4">自然增长率</div>
+			</div>
+		</div>
+	<!-- 柱状图 -->
+		<div style="position: absolute;top: 130px;left: 30px;width: 200px;height: 30px;line-height: 30px;text-align: center;font-size: 18px;z-index: 999;">本省份总人口历年数据</div>
+		<div class="div_1" ></div>
+		<div id="out">
+			<div style="margin-left:30px;margin-top:15px;font-size:18px;">6岁以上人口学历情况</div>
+			<div id="pie" ></div>
+		</div>
+	</div>
+
+	
+
+
+</body>
+<script src="./d3v5.js"></script>
+<script src="./d3.v3.min.js"></script>
+<script type="text/javascript">
+	this.d3=d3;
+	// let index;
+//初始化数据
+	var s_width = 950//画布宽度
+	var s_height = 450//画布高度
+	var s_padding = {left:180,right:30,top:70,bottom:20}//画布边距
+	var rectPadding = 30//矩形之间的间距
+	var dataset = []//纵轴数据
+	var index_year = [ '2011', '2012', '2013', '2014', '2015', '2016', '2017', '2018','2019','2020']//横轴数据
+	document.getElementById("part").innerHTML=province
+//读取数据
+
+var n = 2
+function abb(n){
+	//读取出生率数据
+	var data_2 = d3.csv("./data/birth_rate/birth_rate.csv",function(data){
+		var data = d3.csv.parseRows(d3.csv.format(data))
+		// var data=d3.csv.parseRows(data);
+		// var data=data;
+		// let tt=[];
+		// tt.push(data);
+		// console.log(tt);
+		// data=tmp;
+		var i =  0
+		while(data[i][0]!=province){
+			i++;
+		}//找到本省的行i
+		document.getElementById("birth_rate").innerHTML=data[i][n]+"%"	
+	})
+	//读取死亡率数据
+	var data_3 = d3.csv("./data/death_rate/death_rate.csv",function(error,data){
+		var data = d3.csv.parseRows(d3.csv.format(data))
+		// console.log(data)
+		var i =  0
+		while(data[i][0]!=province){
+			i++;
+		}//找到本省的行i
+		document.getElementById("death_rate").innerHTML=data[i][n]+"%"
+	})
+	//读取自然增长率数据
+	var data_4 = d3.csv("./data/growth_rate/growth_rate.csv",function(error,data){
+		var data = d3.csv.parseRows(d3.csv.format(data))
+		// console.log(data)
+		var i =  0
+		while(data[i][0]!=province){
+			i++;
+		}//找到本省的行i
+		document.getElementById("growth_rate").innerHTML=data[i][n]+"%"
+	})
+}
+abb(n)	
+
+function add(){
+//初始化数据补充
+	var max = d3.max(dataset)//最大数据
+	var min = d3.min(dataset)//最小y轴值
+	if(min - 1000<0){
+		min = 0
+	}else{
+		min = min - 1000
+	}
+//添加画布
+	var svg = d3.select(".div_1")
+				.append("svg")
+				.attr("width",s_width)
+				.attr("height",s_height)
+//添加x轴			
+	var xScale = d3.scale.ordinal()//创建序数比例尺
+				   .domain(index_year)
+				   .range([0,1,2,3,4,5,6,7,8,9])
+				   .rangeRoundBands([0,s_width-s_padding.left-s_padding.right])
+	var xAxis = d3.svg.axis()
+				  .scale(xScale)
+				  .orient("bottom")
+	svg.append("g")
+	   .attr("class","axis axis--x")
+	   .attr("transform","translate("+s_padding.left+","+(s_height - s_padding.bottom)+")")
+	   .call(xAxis)
+//添加y轴
+	var yScale = d3.scale.linear()
+				   .domain([min,d3.max(dataset)])
+				   .range([s_height-s_padding.top-s_padding.bottom,0])
+	var yAxis = d3.svg.axis()
+				  .scale(yScale)
+				  .orient("left")
+	svg.append("g")
+	   .attr("class","axis axis--y")
+	   .attr("transform","translate("+s_padding.left+","+s_padding.top+")")
+	   .call(yAxis)
+//设置刻度字体大小
+	svg.selectAll(".tick")
+	   .style({
+	   		"font-size":"16px"
+	   })
+//添加矩形
+	var rects = svg.selectAll(".rects")
+				   .data(dataset)
+				   .enter()
+				   .append("rect")
+				   .attr("class","rects")
+				   .attr("transform","translate(" + s_padding.left + "," + s_padding.top + ")")
+				   .attr("x",function(d,i){
+				   		return i*xScale.rangeBand()+rectPadding/2
+				   })
+            	   .attr("y",function(d){
+            	   		return s_height-s_padding.top-s_padding.bottom
+            	   })
+				   .attr("fill", function(d){
+                		return "rgb(56,179,"+(d-min)/(max-min)*200+")"// 根据值的大小获取颜色
+            	   })
+            	   .on("mouseover",function(d,i){
+            	   		d3.select(this)
+                    	  .attr("fill","grey");
+            	   })
+            	   .on("mouseout",function(d,i){
+            	   		d3.select(this)
+            	   		  .transition()
+            	   		  .duration(500)
+            	   		  .attr("fill",function(d){
+            	   		  	return "rgb(56,179,"+(d-min)/(max-min)*200+")"
+            	   		  })
+            	   })
+				   .on("click",function(d,i){
+					   // console.log("i="+i)
+					   let index=i;
+					   i=i+2
+					   // let oDiv=document.getElementsByClassName("pie");
+					   // oDiv.removeChild();
+					   pie(index_year[index]);
+					//    if(i == 11) i = 10
+					   abb(i)
+					   abb1(i)
+				   })
+				   .attr("height",0)
+				   .transition()
+				   .duration(1200)
+				   .attr("y",function(d){
+				   		return yScale(d)
+				   })
+				   .attr("height",function(d){
+				   		return s_height - s_padding.top - s_padding.bottom - yScale(d)
+				   })
+				   .attr("width",xScale.rangeBand()-rectPadding)
+				   
+//添加文本
+	var texts = svg.selectAll(".texts")
+				   .data(dataset)
+				   .enter()
+				   .append("text")
+				   .attr("class","texts")
+				   .attr("transform","translate("+s_padding.left+","+s_padding.top+")")
+				   .attr("x", function(d,i){
+                		return i*(xScale.rangeBand()) + rectPadding/2;
+            	   })
+            	   .attr("y",function(d){
+                		return yScale(d);
+            	   })
+            	   .attr("dx",function(){
+                		return (xScale.rangeBand() - rectPadding)/2;
+            	   })
+            	   .attr("dy",function(d){
+                		return 20;
+            	   })
+            	   .text(function(d){
+                		return d;
+            	   })
+            	   .style({
+                		"fill":"#FFF",
+                		"text-anchor":"middle",
+                		'font-size': 15
+            	   });
+			    }	
+//读取人口数据
+var m = 1
+	
+	var data_1 = d3.csv("./data/polulation/polulation.csv",function(error,data){
+		var data = d3.csv.parseRows(d3.csv.format(data))
+		// console.log(data)
+		var i =  0
+		while(data[i][0]!=province){
+			i++;
+		}//找到本省的行i
+		document.getElementById("num").innerHTML=data[i][1]+",0000,0000"
+		var j = 10
+		for(j;j>0;j--){
+			dataset.push(data[i][j])
+		}
+		// console.log(dataset);
+		add()
+	})
+	function abb1(m){
+		var data_1 = d3.csv("./data/polulation/polulation.csv",function(error,data){
+		var data = d3.csv.parseRows(d3.csv.format(data))
+		var i =  0
+		while(data[i][0]!=province){
+			i++;
+		}//找到本省的行i
+		// console.log("m1="+m)
+		var a=[0,0,10,9,8,7,6,5,4,3,2,1]
+		m = a[m]
+		// console.log("m="+m)
+		document.getElementById("num").innerHTML=data[i][m]+",0000,0000"
+		
+	})
+	}
+
+
+</script>
+
+<script>
+	//饼图数据处理部分
+	let f1=function(){
+		let ns=d3v5.csv("./data/school/no_school.csv",function(data){
+			return data;
+		});
+		return ns;
+	}
+	let f2=function(){
+		let ps=d3v5.csv("./data/school/primary_school.csv",function(data){
+			return data;
+		});
+		return ps;
+	}
+	let f3=function(){
+		let ms=d3v5.csv("./data/school/middle_school.csv",function(data){
+			return data;
+		});
+		return ms;
+	}
+	let f4=function(){
+		let hs=d3v5.csv("./data/school/high_school.csv",function(data){
+			return data;
+		});
+		return hs;
+	}
+	let f5=function(){
+		let cs=d3v5.csv("./data/school/collage_school.csv",function(data){
+			return data;
+		});
+		return cs;
+	}
+	let f=function(year,ns,ps,ms,hs,cs){
+		if(year==2020 || year==2010) year=year-1;
+		year+="年";
+		let tmp=[];
+		for(let l=0;l<ns.length;l++){
+			if(ns[l]["地区"]==province){
+				let obj={
+					name:"未上学",
+					value:Number(ns[l][year])
+				}
+				tmp.push(obj);
+			}
+		}
+		
+		for(let l=0;l<ps.length;l++){
+			if(ps[l]["地区"]==province){
+				let obj={
+					name:"小学学历",
+					value:Number(ps[l][year])
+				}
+				tmp.push(obj);
+			}
+		}
+		
+		for(let l=0;l<ms.length;l++){
+			if(ms[l]["地区"]==province){
+				let obj={
+					name:"初中学历",
+					value:Number(ms[l][year])
+				}
+				tmp.push(obj);
+			}
+		}
+		
+		for(let l=0;l<hs.length;l++){
+			if(hs[l]["地区"]==province){
+				let obj={
+					name:"高中学历",
+					value:Number(hs[l][year])
+				}
+				tmp.push(obj);
+			}
+		}
+		
+		for(let l=0;l<cs.length;l++){
+			if(cs[l]["地区"]==province){
+				let obj={
+					name:"大学及以上",
+					value:Number(cs[l][year])
+				}
+				tmp.push(obj);
+			}
+		}
+		return tmp;
+	}
+	
+	//饼图部分
+	async function pie(year){
+		let ns=await f1();
+		let ps=await f2();
+		let ms=await f3();
+		let hs=await f4();
+		let cs=await f5();
+		// console.log(cs);
+		let Data=await f(year,ns,ps,ms,hs,cs);
+		console.log(Data);
+		
+
+		
+		let _this = this
+		let width = 500
+		let height = 500
+		document.getElementById('pie').innerHTML = '';
+		// document.getElementById("pie").innerHTML=""
+		let svg = d3v5.select('#pie')
+		    .append('svg')
+		    .attr('width', width + 'px')
+		    .attr('height', height + 'px')
+			.style("margin-left",170)
+			.style("margin-top",0)
+		
+		let pie = d3v5.pie(Data)
+		    // .value((d) => d.value)
+			.value(function(d){
+				return d.value;
+			})
+		
+		// 数据转化
+		let pieData = pie(Data)
+		// console.log(pieData);
+		let outerRadius = width / 2.8
+		let innerRadius = 0
+		
+		// 创建弧生成器
+		let arc = d3v5.arc()
+		    .innerRadius(outerRadius)
+		    .outerRadius(innerRadius)
+		let color = d3.scale.category20();
+		// let color=d3v5.interpolateCool;
+		
+		let arcs = svg.selectAll('g')
+		    .data(pieData)
+		    .enter()
+		    .append('g')
+		    .attr('transform', 'translate(' + width / 2 + ',' + height / 2 + ')')
+		
+		arcs.append('path')
+		    .attr('fill', function (d, i) { return color(i) })
+		    .attr('d', function (d, i) { return arc(d) })
+		    // 设置动画
+		    .transition()
+		    .duration(3000)
+		    .attrTween('d', function (d, i) {
+		      let fn = d3.interpolateObject({
+		        endAngle: d.startAngle
+		      }, d)
+		      return function (i) {
+		        return arc(fn(i))
+		      }
+		    })
+		
+		// 添加文字value
+		arcs.append('text')
+		    .attr('transform', function (d) {
+		      let x = arc.centroid(d)[0] * 1.4
+		      let y = arc.centroid(d)[1] * 1.4
+		      return 'translate(' + x + ',' + y + ')'
+		    })
+		    .attr('text-anchor', 'middle')
+		    .attr('font-size', '14')
+		    .text(function (d) {
+		      return d.value
+		    })
+		
+		// 添加文字name
+		arcs.append('text')
+		    .attr('transform', function (d) {
+		      let x = arc.centroid(d)[0] * 2.5
+		      let y = arc.centroid(d)[1] * 2.5
+		      return 'translate(' + x + ',' + y + ')'
+		    })
+		    .attr('text-anchor', 'middle')
+		    .attr('font-size', '14')
+		    .text(function (d) {
+		      return d.data.name
+		    })
+		
+		// 添加直线
+		arcs.append('line')
+		    .attr('stroke', 'black')
+		    .attr('stroke-width', '2px')
+		    .attr('x1', function (d) { return arc.centroid(d)[0] * 2 })
+		    .attr('y1', function (d) { return arc.centroid(d)[1] * 2 })
+		    .attr('x2', function (d) { return arc.centroid(d)[0] * 2.3 })
+		    .attr('y2', function (d) { return arc.centroid(d)[1] * 2.3 })
+			
+		// svg.append('g')
+		// 	.attr('transform','translate('+()+','+20+')')
+		// 	.append("text")
+		// 	.text("")
+		// 	.attr('class','title')
+		// 	.style('font-size',20)
+	}
+	pie(2020);
+</script>
+</html>
